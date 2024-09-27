@@ -4,6 +4,7 @@ import json
 import pyperclip
 import os
 import requests
+import uuid
 
 class StableDiffusionPromptGenerator:
     def __init__(self, master):
@@ -33,9 +34,9 @@ class StableDiffusionPromptGenerator:
         try:
             with open('setting.json', 'r', encoding='utf-8') as f:
                 settings = json.load(f)
-                self.azure_endpoint = settings['AZURE_OPENAI_ENDPOINT']
-                self.azure_key = settings['AZURE_OPENAI_KEY']
-                self.deployment_name = settings['DEPLOYMENT_NAME']
+                self.translator_endpoint = settings['TRANSLATOR_ENDPOINT']
+                self.translator_key = settings['TRANSLATOR_KEY']
+                self.translator_region = settings['TRANSLATOR_REGION']
         except FileNotFoundError:
             print("Settings file not found. Please create a setting.json file.")
         except json.JSONDecodeError:
@@ -110,36 +111,53 @@ class StableDiffusionPromptGenerator:
         return ','.join(prompt_parts)
 
     def translate_to_english(self, japanese_prompt):
-        response = requests.post(
-            f"{self.azure_endpoint}/openai/deployments/{self.deployment_name}/chat/completions?api-version=2023-05-15",
-            headers={
-                "Content-Type": "application/json",
-                "api-key": self.azure_key
-            },
-            json={
-                "messages": [
-                    {"role": "system", "content": "You are a translator. Translate the given Japanese text to English. Return only the translated keywords, separated by newlines."},
-                    {"role": "user", "content": f"Translate these keywords to English:\n{japanese_prompt}"}
-                ]
-            }
-        )
-        
-        if response.status_code == 200:
-            return response.json()['choices'][0]['message']['content'].strip().split('\n')
+        endpoint = self.translator_endpoint
+        subscription_key = self.translator_key
+        region = self.translator_region
+
+        path = '/translate'
+        constructed_url = endpoint + path
+
+        params = {
+            'api-version': '3.0',
+            'from': 'ja',
+            'to': ['en']
+        }
+
+        headers = {
+            'Ocp-Apim-Subscription-Key': subscription_key,
+            'Ocp-Apim-Subscription-Region': region,
+            'Content-type': 'application/json',
+            'X-ClientTraceId': str(uuid.uuid4())
+        }
+
+        body = [{
+            'text': japanese_prompt
+        }]
+
+        request = requests.post(constructed_url, params=params, headers=headers, json=body)
+        response = request.json()
+
+        if request.status_code == 200:
+            translated_text = response[0]['translations'][0]['text']
+            return translated_text.split(',')
         else:
-            print(f"Error translating prompt: {response.status_code}")
+            print(f"Error translating prompt: {request.status_code}")
             return japanese_prompt.split(',')  # Fallback to original prompt
 
     def format_prompt(self, keywords):
         formatted_keywords = []
         for keyword in keywords:
             keyword = keyword.strip()
-            if ':' in keyword:
+            if keyword.startswith('(') and keyword.endswith(')'):
+                # カッコが既に存在する場合は、そのまま使用
+                formatted_keywords.append(keyword)
+            elif ':' in keyword:
                 base, weight = keyword.rsplit(':', 1)
                 formatted_keywords.append(f"({base.strip()}:{weight.strip()})")
             else:
                 formatted_keywords.append(f"({keyword})")
-        return ','.join(formatted_keywords)
+        return ', '.join(formatted_keywords)
 
     def copy_to_clipboard(self):
         prompt = self.output.get("1.0", tk.END).strip()
@@ -188,4 +206,3 @@ if __name__ == "__main__":
     app = StableDiffusionPromptGenerator(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()
-    
