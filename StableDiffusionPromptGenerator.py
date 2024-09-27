@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
+import tkinter.font as tkfont
 import json
 import pyperclip
 import os
@@ -10,6 +11,9 @@ class StableDiffusionPromptGenerator:
     def __init__(self, master):
         self.master = master
         master.title("Stable Diffusion Prompt Generator")
+
+        # フォントの設定
+        self.custom_font = tkfont.Font(family="MS UI Gothic", size=14)
 
         # Load settings
         self.load_settings()
@@ -47,17 +51,17 @@ class StableDiffusionPromptGenerator:
     def create_widgets(self):
         # Fixed text input
         ttk.Label(self.master, text="固定テキスト:").grid(row=0, column=0, sticky="w", padx=5, pady=5)
-        self.fixed_text = tk.Text(self.master, height=3, width=50)
+        self.fixed_text = tk.Text(self.master, height=3, width=50, font=self.custom_font)
         self.fixed_text.grid(row=1, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
 
         # Keywords input
         ttk.Label(self.master, text="キーワード (1行に1つ):").grid(row=2, column=0, sticky="w", padx=5, pady=5)
-        self.keywords = tk.Text(self.master, height=10, width=50)
+        self.keywords = tk.Text(self.master, height=10, width=50, font=self.custom_font)
         self.keywords.grid(row=3, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
 
         # Output
         ttk.Label(self.master, text="生成されたプロンプト:").grid(row=4, column=0, sticky="w", padx=5, pady=5)
-        self.output = tk.Text(self.master, height=5, width=50)
+        self.output = tk.Text(self.master, height=5, width=50, font=self.custom_font)
         self.output.grid(row=5, column=0, columnspan=3, sticky="nsew", padx=5, pady=5)
 
         # Buttons
