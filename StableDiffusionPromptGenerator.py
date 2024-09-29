@@ -18,18 +18,22 @@ class StableDiffusionPromptGenerator:
         # Load settings
         self.load_settings()
 
+        # Initialize history
+        self.history = []
+        self.load_history()  # 履歴の読み込み
+
         # Create GUI elements
         self.create_widgets()
+        self.create_history_combobox()  # 履歴のコンボボックスを作成
 
         # Load previous work and window settings
         self.load_work()
 
         # Configure row and column weights for resizing
-        for i in range(7):
+        for i in range(8):  # 行数を8に変更
             master.grid_rowconfigure(i, weight=1)
-        master.grid_columnconfigure(0, weight=1)
-        master.grid_columnconfigure(1, weight=1)
-        master.grid_columnconfigure(2, weight=1)
+        for i in range(3):  # 列数を3に設定
+            master.grid_columnconfigure(i, weight=1)
 
         # Bind the configure event to update_layout
         master.bind("<Configure>", self.update_layout)
@@ -74,6 +78,12 @@ class StableDiffusionPromptGenerator:
         self.copy_button = ttk.Button(self.master, text="コピー", command=self.copy_to_clipboard)
         self.copy_button.grid(row=6, column=2, pady=10)
 
+    def create_history_combobox(self):
+        ttk.Label(self.master, text="履歴:").grid(row=7, column=0, sticky="w", padx=5, pady=5)
+        self.history_combobox = ttk.Combobox(self.master, values=[], state='readonly')
+        self.history_combobox.grid(row=7, column=1, columnspan=2, sticky="nsew", padx=5, pady=5)
+        self.history_combobox.bind("<<ComboboxSelected>>", self.load_from_history)
+
     def update_layout(self, event=None):
         # Update text widget sizes
         width = self.master.winfo_width() - 20  # Subtract padding
@@ -84,24 +94,27 @@ class StableDiffusionPromptGenerator:
     def generate_prompt(self):
         fixed_keywords = self.fixed_text.get("1.0", tk.END).strip().split('\n')
         user_keywords = self.keywords.get("1.0", tk.END).strip().split('\n')
-        
+
         all_keywords = fixed_keywords + user_keywords
-        
+
         # Create Japanese prompt
         japanese_prompt = self.create_prompt(all_keywords)
-        
+
         # Translate prompt to English
         english_keywords = self.translate_to_english(japanese_prompt)
-        
+
         # Format the English keywords
         formatted_prompt = self.format_prompt(english_keywords)
-        
+
         # Set output
         self.output.delete("1.0", tk.END)
         self.output.insert(tk.END, formatted_prompt)
-        
-        # Save work
+
+        # Save work and history (ここを修正)
         self.save_work()
+        self.history.append('\n'.join(all_keywords))  # 入力キーワードを履歴に保存
+        self.save_history()  # 履歴を保存
+        self.update_history_combobox()  # コンボボックスを更新
 
     def create_prompt(self, keywords):
         prompt_parts = []
@@ -111,7 +124,7 @@ class StableDiffusionPromptGenerator:
                 prompt_parts.append(f"({base.strip()}:{weight.strip()})")
             else:
                 prompt_parts.append(f"({keyword.strip()})")
-        
+
         return ','.join(prompt_parts)
 
     def translate_to_english(self, japanese_prompt):
@@ -201,8 +214,31 @@ class StableDiffusionPromptGenerator:
         with open('work.json', 'w', encoding='utf-8') as f:
             json.dump(work, f, ensure_ascii=False, indent=2)
 
+    def load_history(self):
+        try:
+            with open('history.json', 'r', encoding='utf-8') as f:
+                self.history = json.load(f)
+        except FileNotFoundError:
+            self.history = []
+        except json.JSONDecodeError:
+            print("Error decoding the history file. Please check the JSON format.")
+
+    def save_history(self):
+        with open('history.json', 'w', encoding='utf-8') as f:
+            json.dump(self.history, f, ensure_ascii=False, indent=2)
+
+    def load_from_history(self, event=None):
+        selected_prompt = self.history_combobox.get()
+        if selected_prompt:
+            self.keywords.delete("1.0", tk.END)  # 入力キーワードエリアをクリア
+            self.keywords.insert(tk.END, selected_prompt)  # 選択したキーワードを挿入
+
+    def update_history_combobox(self):
+        self.history_combobox['values'] = self.history
+
     def on_closing(self):
         self.save_work()
+        self.save_history()  # ここで履歴を保存
         self.master.destroy()
 
 if __name__ == "__main__":
